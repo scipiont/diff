@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Сравнение кода — понятный дифф</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg: #0f1321;
+    --panel: #151a2f;
+    --panel-2: #101427;
+    --text: #e9edff;
+    --muted: #9aa7d1;
+    --border: #263157;
+    --accent: #6ea4ff;
+    --ok-border: rgba(46, 204, 113, .55);
+
+--eq-bg: rgba(80, 120, 255, .08);
+--eq-border: rgba(80, 120, 255, .45);
+
+--miss-bg: rgba(255, 99, 99, .12);
+--miss-border: rgba(255, 99, 99, .55);
+
+--chg-bg: rgba(255, 214, 102, .14);
+--chg-border: rgba(246, 178, 60, .65);
+
+--tok-add-bg: rgba(42, 201, 110, .15);
+--tok-add-underline: rgba(42, 201, 110, .55);
+
+--tok-del-bg: rgba(255, 99, 99, .15);
+--tok-del-underline: rgba(255, 99, 99, .6);
+
+--tok-chg-bg: rgba(255, 214, 102, .25);
+--indent-bg: rgba(255, 214, 102, .2);
+}
+
+
+{ box-sizing: border-box; } html, body { height: 100%; } body{ margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace; background: radial-gradient(1200px 800px at 70% -200px, #1c2454 0%, #0f1220 60%) fixed, var(--bg); color: var(--text); }
+
+header{
+position: sticky; top: 0; z-index: 10;
+background: linear-gradient(180deg, rgba(15,18,32,0.95) 0%, rgba(15,18,32,0.78) 100%);
+border-bottom: 1px solid var(--border); backdrop-filter: blur(8px);
+}
+.container{ max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+.toolbar{ display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.toolbar .left, .toolbar .right{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.brand{ font-weight: 800; color: var(--accent); letter-spacing: .2px; }
+
+
+button, select, .check{
+background: var(--panel);
+color: var(--text);
+border: 1px solid var(--border);
+border-radius: 10px; padding: 9px 12px; font: inherit;
+}
+button{ cursor: pointer; transition: .15s transform ease, .2s border-color, .2s filter; }
+button:hover{ transform: translateY(-1px); border-color: #3a4a86; }
+.primary{ background: linear-gradient(135deg, #3a66ff, #5f8fff); border: none; }
+.primary:hover{ filter: brightness(1.06); }
+.danger{ background: #3a1e29; border-color: #663345; }
+.secondary{ background: var(--panel-2); }
+select{
+padding-right: 34px;
+background: var(--panel) url('data:image/svg+xml;utf8,<svg fill="%23a9b3d1" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg>') no-repeat right 8px center/16px;
+appearance: none;
+}
+.check{ display: inline-flex; align-items: center; gap: 8px; user-select: none; }
+.check input{ width: 18px; height: 18px; accent-color: var(--accent); }
+
+
+/* Layout */
+.grid{ max-width: 1280px; margin: 12px auto; padding: 0 16px; display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 980px){ .grid{ grid-template-columns: 1fr; } }
+
+
+.panel{
+background: linear-gradient(180deg, var(--panel), var(--panel-2));
+border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+display: grid; grid-template-rows: auto 1fr; min-height: 380px;
+}
+.panel-head{ display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.title{ color: var(--muted); font-size: 13px; }
+.state{ color: var(--muted); font-size: 12px; }
+
+
+.editor-wrap{ position: relative; display: grid; grid-template-columns: 52px 1fr; }
+.gutter{
+background: linear-gradient(180deg, #121634, #0e142f);
+border-right: 1px solid var(--border);
+color: #7e88b5; text-align: right; padding: 12px 8px; font-size: 12px; line-height: 1.55; user-select: none; overflow: hidden;
+}
+.gutter .ln{ display: block; }
+
+
+.input-area, .diff-pane{ position: relative; overflow: auto; }
+textarea.code{
+width: 100%; height: 100%; min-height: 330px; background: transparent; border: 0; outline: none; resize: none;
+color: var(--text); font: inherit; font-size: 13.5px; line-height: 1.55; tab-size: 2; padding: 12px; white-space: pre;
+}
+.placeholder{
+position: absolute; top: 12px; left: 12px; color: #8090c9; pointer-events: none; user-select: none; font-size: 13.5px;
+}
+
+
+/* Diff pane */
+.diff-pane{
+background: linear-gradient(180deg, #0f142b, #0e1328);
+font-size: 13.5px; line-height: 1.55; white-space: pre; padding: 12px; min-height: 330px;
+}
+.line{ display: block; border-left: 3px solid transparent; padding-left: 6px; }
+.line.same{ border-left-color: var(--ok-border); }
+.line.equalish{ background: var(--eq-bg); border-left-color: var(--eq-border); }
+.line.changed{ background: var(--chg-bg); border-left-color: var(--chg-border); }
+.line.missing-left, .line.missing-right{ background: var(--miss-bg); border-left-color: var(--miss-border); }
+
+
+.ln-badge{ display: inline-block; min-width: 34px; margin-left: -40px; padding-right: 6px; text-align: right; color: #7f8cbc; }
+
+
+/* Token highlights (subtle) */
+.token-add{ background: var(--tok-add-bg); border-bottom: 1px solid var(--tok-add-underline); }
+.token-del{ background: var(--tok-del-bg); border-bottom: 1px solid var(--tok-del-underline); text-decoration: none; }
+.token-change{ background: var(--tok-chg-bg); border-bottom: 1px dashed var(--chg-border); }
+.indent{ background: var(--indent-bg); border-bottom: 1px dashed var(--chg-border); }
+
+
+/* Summary */
+.summary{ max-width: 1280px; margin: 8px auto 18px; padding: 12px 16px; display: grid; gap: 10px; grid-template-columns: 1fr;
+background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; }
+.badges{ display: flex; flex-wrap: wrap; gap: 8px; }
+.badge{ display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 999px; font-size: 13px;
+background: #18204c; color: #d6defc; border: 1px solid #2b3a7a; }
+.badge.good{ background: #112a22; color: #d8ffec; border-color: #254c3f; }
+.badge.warn{ background: #2c2413; color: #fff4d6; border-color: #4a3f22; }
+.badge.bad{ background: #331b1f; color: #ffd9df; border-color: #5b2e37; }
+.legend{ display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 12px; }
+.chip{ display: inline-flex; gap: 6px; align-items: center; padding: 4px 8px; border-radius: 8px; background: #121633; border: 1px solid var(--border); }
+.box{ width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
+.b-miss{ background: var(--miss-bg); border: 1px solid var(--miss-border); }
+.b-chg{ background: var(--chg-bg); border: 1px solid var(--chg-border); }
+.b-eq{ background: var(--eq-bg); border: 1px solid var(--eq-border); }
+
+
+.foot{ max-width: 1280px; margin: 0 auto 24px; padding: 0 16px; color: var(--muted); font-size: 12px; }
+
+
+.toast{ position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+background:#1b234a; border:1px solid #2b3a7a; color:#d6defc; padding:10px 14px; border-radius:10px; z-index:9999; box-shadow:0 10px 30px rgba(0,0,0,0.3); }
+</style>
+
+
+</head>
+<body>
+<header>
+  <div class="container toolbar">
+    <div class="left">
+      <div class="brand">Сравнение кода</div>
+      <select id="preset">
+        <option value="strict">Строгий</option>
+        <option value="format">Игнорировать формат</option>
+        <option value="semantic">Формат + комментарии</option>
+        <option value="case">Без учета регистра</option>
+      </select>
+      <label class="check" title="Игнорировать различия пробелов/табов/пустых строк">
+        <input type="checkbox" id="optWS"> Игнорировать пробелы
+      </label>
+      <label class="check" title="Убирать //, /* */, # комментарии (по строкам)">
+        <input type="checkbox" id="optComments"> Игнорировать комментарии
+      </label>
+      <label class="check" title="Сравнивать без учета регистра">
+        <input type="checkbox" id="optCase"> Без учета регистра
+      </label>
+      <label class="check" title="Подсвечивать различия отступов (пробелы/табы)">
+        <input type="checkbox" id="optIndent" checked> Подсветка отступов
+      </label>
+      <label class="check" title="В результате показывать только строки с отличиями">
+        <input type="checkbox" id="optOnlyDiff"> Только различия
+      </label>
+    </div>
+    <div class="right">
+      <button class="secondary" id="swapBtn">Поменять</button>
+      <button class="danger" id="clearBtn">Очистить</button>
+      <button class="primary" id="compareBtn" title="Ctrl/⌘+Enter">Сравнить</button>
+    </div>
+  </div>
+</header>
+<main>
+  <section class="grid">
+    <div class="panel" id="panelL">
+      <div class="panel-head">
+        <div class="title">Левая область • <span class="state" id="stateL">Редактирование</span></div>
+        <div class="panel-actions">
+          <button class="secondary" id="copyL">Копировать</button>
+          <button class="secondary" id="editL">Редактирование</button>
+        </div>
+      </div>
+      <div class="editor-wrap">
+        <div class="gutter" id="gutL"></div>
+        <div class="input-area" id="inL">
+          <textarea id="left" class="code" spellcheck="false"></textarea>
+          <div class="placeholder" id="phL">Вставьте код сюда…</div>
+        </div>
+        <div class="diff-pane" id="diffL" style="display:none"></div>
+      </div>
+    </div>
+<div class="panel" id="panelR">
+  <div class="panel-head">
+    <div class="title">Правая область • <span class="state" id="stateR">Редактирование</span></div>
+    <div class="panel-actions">
+      <button class="secondary" id="copyR">Копировать</button>
+      <button class="secondary" id="editR">Редактирование</button>
+    </div>
+  </div>
+  <div class="editor-wrap">
+    <div class="gutter" id="gutR"></div>
+    <div class="input-area" id="inR">
+      <textarea id="right" class="code" spellcheck="false"></textarea>
+      <div class="placeholder" id="phR">…и сюда, затем нажмите «Сравнить»</div>
+    </div>
+    <div class="diff-pane" id="diffR" style="display:none"></div>
+  </div>
+</div>
+
+</section>
+  <section class="summary" id="summary" style="display:none">
+    <div class="badges" id="badges"></div>
+    <div class="legend">
+      <span class="chip"><span class="box b-miss"></span> Строки, отсутствующие с одной стороны</span>
+      <span class="chip"><span class="box b-chg"></span> Измененные строки / отступы</span>
+      <span class="chip"><span class="box b-eq"></span> Эквивалент при выбранных опциях</span>
+    </div>
+  </section>
+  <div class="foot">Подсказка: Ctrl/⌘+Enter — сравнить. Подсветка мягкая и включается только по кнопке «Сравнить». «Редактирование» возвращает к вводу текста.</div>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const left = $('left'), right = $('right');
+  const diffL = $('diffL'), diffR = $('diffR');
+  const inL = $('inL'), inR = $('inR');
+  const gutL = $('gutL'), gutR = $('gutR');
+  const phL = $('phL'), phR = $('phR');
+  const stateL = $('stateL'), stateR = $('stateR');
+  const optWS = $('optWS'), optComments = $('optComments'), optCase = $('optCase'), optIndent = $('optIndent'), optOnlyDiff = $('optOnlyDiff');
+  const preset = $('preset');
+
+  const LS = { left:'cd_left', right:'cd_right', opts:'cd_opts', preset:'cd_preset' };
+
+  function escapeHTML(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function lines(s){ return s.replace(/\r/g,'').split('\n'); }
+  function buildGutterByCount(n){
+    n = Math.max(1, n);
+    let out = '';
+    for(let i=1;i<=n;i++) out += `<span class="ln">${i}</span>\n`;
+    return out;
+  }
+  function buildGutterFromText(text){
+    return buildGutterByCount(lines(text).length);
+  }
+  function updatePlaceholders(){
+    phL.style.display = left.value.trim() ? 'none' : 'block';
+    phR.style.display = right.value.trim() ? 'none' : 'block';
+  }
+  function refreshGuttersForInputs(){
+    gutL.innerHTML = buildGutterFromText(left.value);
+    gutR.innerHTML = buildGutterFromText(right.value);
+  }
+
+  // Comment stripping line-wise (keeps one line per original)
+  function stripCommentsLinewise(arr){
+    let inBlock = false;
+    const out = [];
+    for(let line of arr){
+      let s = line, res = '', i = 0;
+      while(i < s.length){
+        if(inBlock){
+          const end = s.indexOf('*/', i);
+          if(end === -1){ i = s.length; break; }
+          i = end + 2; inBlock = false;
+        } else {
+          const iBlock = s.indexOf('/*', i);
+          const iSlash = s.indexOf('//', i);
+          const iHash = s.indexOf('#', i);
+          const positions = [iBlock, iSlash, iHash].filter(x=>x>=0).sort((a,b)=>a-b);
+          if(positions.length===0){ res += s.slice(i); break; }
+          const next = positions[0];
+          if(next === iBlock){ res += s.slice(i, iBlock); i = iBlock + 2; inBlock = true; }
+          else { res += s.slice(i, next); break; }
+        }
+      }
+      out.push(res);
+    }
+    return out;
+  }
+
+  function normalizeLine(s){
+    let t = s;
+    if(optWS.checked){
+      t = t.replace(/[ \t]+/g,' ');
+      t = t.replace(/[ \t]+$/,'');
+    }
+    if(optCase.checked) t = t.toLowerCase();
+    return t;
+  }
+
+  function preprocessLines(orig){
+    let arr = orig.slice();
+    if(optComments.checked) arr = stripCommentsLinewise(arr);
+    return arr.map(normalizeLine);
+  }
+
+  function lcsMatrix(a, b, eq){
+    const n=a.length, m=b.length;
+    const dp = Array(n+1);
+    for(let i=0;i<=n;i++) dp[i] = new Array(m+1).fill(0);
+    for(let i=n-1;i>=0;i--){
+      for(let j=m-1;j>=0;j--){
+        if(eq(a[i], b[j])) dp[i][j] = dp[i+1][j+1] + 1;
+        else dp[i][j] = Math.max(dp[i+1][j], dp[i][j+1]);
+      }
+    }
+    return dp;
+  }
+  function diffSeq(a, b, eq){
+    const dp = lcsMatrix(a,b,eq);
+    let i=0, j=0, out=[];
+    while(i<a.length && j<b.length){
+      if(eq(a[i], b[j])){ out.push({t:'eq', ai:i, bj:j}); i++; j++; }
+      else if(dp[i+1][j] >= dp[i][j+1]){ out.push({t:'del', ai:i}); i++; }
+      else { out.push({t:'ins', bj:j}); j++; }
+    }
+    while(i<a.length){ out.push({t:'del', ai:i}); i++; }
+    while(j<b.length){ out.push({t:'ins', bj:j}); j++; }
+    return out;
+  }
+
+  function tokenize(line){
+    const tokens = [];
+    let buf = '';
+    const isWord = ch => /[A-Za-zА-Яа-я0-9_]/.test(ch);
+    for(let i=0;i<line.length;i++){
+      const ch = line[i];
+      if(buf && (/[A-Za-zА-Яа-я0-9_]/.test(buf[buf.length-1]) !== isWord(ch))){
+        tokens.push(buf); buf = '';
+      }
+      buf += ch;
+    }
+    if(buf) tokens.push(buf);
+    return tokens;
+  }
+  function tokenDiffHTML(a, b){
+    const A = tokenize(a), B = tokenize(b);
+    const ops = diffSeq(A, B, (x,y)=>x===y);
+    let L='', R='';
+    for(const op of ops){
+      if(op.t==='eq'){ L += escapeHTML(A[op.ai] ?? ''); R += escapeHTML(B[op.bj] ?? ''); }
+      else if(op.t==='del'){ L += `<span class="token-del" title="Удалено слева">${escapeHTML(A[op.ai])}</span>`; }
+      else if(op.t==='ins'){ R += `<span class="token-add" title="Добавлено справа">${escapeHTML(B[op.bj])}</span>`; }
+    }
+    return {L, R};
+  }
+  function isIndentOnly(a, b){
+    const aInd = (a.match(/^[ \t]*/)||[''])[0], bInd = (b.match(/^[ \t]*/)||[''])[0];
+    return a.trimStart() === b.trimStart() && aInd !== bInd;
+  }
+
+  // Build diff with pairing of replace (del+ins) into one "changed" row
+  function buildDiffHTML(srcL, srcR){
+    const origL = lines(srcL), origR = lines(srcR);
+    const normL = preprocessLines(origL), normR = preprocessLines(origR);
+
+    const itemsL = origL.map((o,i)=>({o, n: normL[i]}));
+    const itemsR = origR.map((o,i)=>({o, n: normR[i]}));
+
+    const ops = diffSeq(itemsL, itemsR, (x,y)=>x.n === y.n);
+
+    let leftHTML = '', rightHTML = '';
+    let vL = 1, vR = 1;
+
+    let i = 0;
+    const onlyDiff = optOnlyDiff.checked;
+
+    while(i < ops.length){
+      const op = ops[i];
+
+      if(op.t === 'eq'){
+        const a = itemsL[op.ai].o, b = itemsR[op.bj].o;
+        const exact = a === b;
+        if(!onlyDiff){
+          if(exact){
+            leftHTML += `<div class="line same" title="Совпадает"><span class="ln-badge">${vL}</span>${escapeHTML(a)}</div>`;
+            rightHTML += `<div class="line same" title="Совпадает"><span class="ln-badge">${vR}</span>${escapeHTML(b)}</div>`;
+          }else if(optIndent.checked && isIndentOnly(a,b)){
+            const aInd = a.match(/^[ \t]*/)[0], bInd = b.match(/^[ \t]*/)[0];
+            const av = `<span class="indent" title="Разные отступы">${escapeHTML(aInd.replace(/ /g,'·').replace(/\t/g,'→'))}</span>${escapeHTML(a.slice(aInd.length))}`;
+            const bv = `<span class="indent" title="Разные отступы">${escapeHTML(bInd.replace(/ /g,'·').replace(/\t/g,'→'))}</span>${escapeHTML(b.slice(bInd.length))}`;
+            leftHTML  += `<div class="line changed"><span class="ln-badge">${vL}</span>${av}</div>`;
+            rightHTML += `<div class="line changed"><span class="ln-badge">${vR}</span>${bv}</div>`;
+          }else{
+            leftHTML  += `<div class="line equalish" title="Эквивалентно при выбранных опциях"><span class="ln-badge">${vL}</span>${escapeHTML(a)}</div>`;
+            rightHTML += `<div class="line equalish" title="Эквивалентно при выбранных опциях"><span class="ln-badge">${vR}</span>${escapeHTML(b)}</div>`;
+          }
+        }
+        vL++; vR++; i++; continue;
+      }
+
+      // Collect a block of dels and ins until next eq
+      const dels = [], ins = [];
+      let j = i;
+      while(j < ops.length && ops[j].t !== 'eq'){
+        if(ops[j].t === 'del') dels.push(ops[j].ai);
+        else ins.push(ops[j].bj);
+        j++;
+      }
+      const p = Math.min(dels.length, ins.length);
+      // Pair into changed rows
+      for(let k=0; k<p; k++){
+        const a = itemsL[dels[k]].o, b = itemsR[ins[k]].o;
+        if(optIndent.checked && isIndentOnly(a,b)){
+          const aInd = a.match(/^[ \t]*/)[0], bInd = b.match(/^[ \t]*/)[0];
+          const av = `<span class="indent" title="Разные отступы">${escapeHTML(aInd.replace(/ /g,'·').replace(/\t/g,'→'))}</span>${escapeHTML(a.slice(aInd.length))}`;
+          const bv = `<span class="indent" title="Разные отступы">${escapeHTML(bInd.replace(/ /g,'·').replace(/\t/g,'→'))}</span>${escapeHTML(b.slice(bInd.length))}`;
+          leftHTML  += `<div class="line changed"><span class="ln-badge">${vL}</span>${av}</div>`;
+          rightHTML += `<div class="line changed"><span class="ln-badge">${vR}</span>${bv}</div>`;
+        }else{
+          const td = tokenDiffHTML(a,b);
+          leftHTML  += `<div class="line changed" title="Изменено"><span class="ln-badge">${vL}</span>${td.L}</div>`;
+          rightHTML += `<div class="line changed" title="Изменено"><span class="ln-badge">${vR}</span>${td.R}</div>`;
+        }
+        vL++; vR++;
+      }
+      // Leftover deletions = missing on right (red)
+      for(let k=p; k<dels.length; k++){
+        const a = itemsL[dels[k]].o;
+        leftHTML  += `<div class="line missing-right" title="Отсутствует справа"><span class="ln-badge">${vL}</span><span class="token-del">${escapeHTML(a)}</span></div>`;
+        rightHTML += `<div class="line missing-right" title="Отсутствует справа"><span class="ln-badge">${vR}</span></div>`;
+        vL++; vR++;
+      }
+      // Leftover insertions = missing on left (green)
+      for(let k=p; k<ins.length; k++){
+        const b = itemsR[ins[k]].o;
+        leftHTML  += `<div class="line missing-left" title="Отсутствует слева"><span class="ln-badge">${vL}</span></div>`;
+        rightHTML += `<div class="line missing-left" title="Отсутствует слева"><span class="ln-badge">${vR}</span><span class="token-add">${escapeHTML(b)}</span></div>`;
+        vL++; vR++;
+      }
+      i = j;
+    }
+
+    // Обновляем номера строк в линеек под результат
+    gutL.innerHTML = buildGutterByCount(vL-1);
+    gutR.innerHTML = buildGutterByCount(vR-1);
+
+    return { L: leftHTML, R: rightHTML };
+  }
+
+  function buildBadges(srcL, srcR){
+    const arr = [];
+    if(srcL === srcR) { arr.push(`<span class="badge good">✔ Код идентичен</span>`); return arr; }
+
+    const origL = lines(srcL), origR = lines(srcR);
+    const normL = preprocessLines(origL), normR = preprocessLines(origR);
+
+    // Эквивалентность с учетом опций
+    if(normL.join('\n') === normR.join('\n')){
+      arr.push(`<span class="badge good">≈ Эквивалентен при выбранных опциях</span>`);
+    }
+
+    // Порядок строк: проверяем, действительно ли менялся порядок (последовательности не равны, но отсортированные равны)
+    const trimSeq = (arr)=>arr.map(s=>s.trim());
+    const seqEqual = (a,b)=> a.length===b.length && a.every((v,i)=>v===b[i]);
+    const A = trimSeq(normL), B = trimSeq(normR);
+    const sortJoin = s => [...s].sort().join('\n');
+    if(!seqEqual(A,B) && sortJoin(A) === sortJoin(B)){
+      arr.push(`<span class="badge warn">↕ Совпадают по набору строк (порядок разный)</span>`);
+    }
+
+    arr.push(`<span class="badge">Строк: слева ${origL.length}, справа ${origR.length}</span>`);
+    return arr;
+  }
+
+  function notice(msg){
+    const div = document.createElement('div');
+    div.className = 'toast'; div.textContent = msg; document.body.appendChild(div);
+    setTimeout(()=>{ div.style.opacity='0'; div.style.transition='.3s'; }, 1200);
+    setTimeout(()=> div.remove(), 1600);
+  }
+
+  function compare(){
+    const l = left.value, r = right.value;
+    if(!l && !r){
+      $('badges').innerHTML = `<span class="badge">Обе области пусты</span>`;
+      $('summary').style.display = 'grid';
+      diffL.innerHTML=''; diffR.innerHTML='';
+      showResult('L', true); showResult('R', true);
+      return;
+    }
+    const res = buildDiffHTML(l, r);
+    diffL.innerHTML = res.L;
+    diffR.innerHTML = res.R;
+
+    $('badges').innerHTML = buildBadges(l, r).join(' ');
+    $('summary').style.display = 'grid';
+
+    // Показать результат после сравнения
+    showResult('L', true);
+    showResult('R', true);
+    notice('Готово: сравнение выполнено');
+  }
+
+  function showResult(side, show){
+    const diff = side==='L' ? diffL : diffR;
+    const input = side==='L' ? inL : inR;
+    const state = side==='L' ? stateL : stateR;
+    diff.style.display = show ? 'block' : 'none';
+    input.style.display = show ? 'none' : 'block';
+    state.textContent = show ? 'Результат' : 'Редактирование';
+  }
+
+  // Events
+  $('compareBtn').addEventListener('click', compare);
+  document.addEventListener('keydown', e=>{
+    if((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); compare(); }
+  });
+
+  // Кнопки «Редактирование» теперь всегда возвращают к вводу
+  $('editL').addEventListener('click', ()=> showResult('L', false));
+  $('editR').addEventListener('click', ()=> showResult('R', false));
+
+  $('swapBtn').addEventListener('click', ()=>{
+    const t = left.value; left.value = right.value; right.value = t;
+    updatePlaceholders(); refreshGuttersForInputs(); saveLS();
+  });
+
+  $('clearBtn').addEventListener('click', ()=>{
+    left.value=''; right.value='';
+    updatePlaceholders(); refreshGuttersForInputs(); saveLS();
+    diffL.innerHTML=''; diffR.innerHTML='';
+    $('summary').style.display='none';
+    showResult('L', false); showResult('R', false);
+  });
+
+  $('copyL').addEventListener('click', async ()=>{
+    const text = diffL.style.display==='none' ? left.value : getPlain(diffL.innerHTML);
+    try{ await navigator.clipboard.writeText(text); notice('Скопировано (лево)'); }catch(e){}
+  });
+  $('copyR').addEventListener('click', async ()=>{
+    const text = diffR.style.display==='none' ? right.value : getPlain(diffR.innerHTML);
+    try{ await navigator.clipboard.writeText(text); notice('Скопировано (право)'); }catch(e){}
+  });
+  function getPlain(html){ const d=document.createElement('div'); d.innerHTML=html; return d.textContent||''; }
+
+  // Scroll sync for diff panes
+  function bindScrollSync(a,b){
+    let lock=false;
+    function sync(from,to){ if(lock) return; lock=true; to.scrollTop=from.scrollTop; to.scrollLeft=from.scrollLeft; lock=false; }
+    a.addEventListener('scroll', ()=>sync(a,b));
+    b.addEventListener('scroll', ()=>sync(b,a));
+  }
+  bindScrollSync(diffL, diffR);
+
+  // Gutters scroll with textareas
+  left.addEventListener('input', ()=>{ updatePlaceholders(); refreshGuttersForInputs(); saveLS(); });
+  right.addEventListener('input', ()=>{ updatePlaceholders(); refreshGuttersForInputs(); saveLS(); });
+  left.addEventListener('scroll', ()=> gutL.scrollTop = left.scrollTop);
+  right.addEventListener('scroll', ()=> gutR.scrollTop = right.scrollTop);
+
+  // Presets
+  function applyPreset(p){
+    switch(p){
+      case 'strict': optWS.checked=false; optComments.checked=false; optCase.checked=false; optIndent.checked=true; break;
+      case 'format': optWS.checked=true; optComments.checked=false; optCase.checked=false; optIndent.checked=true; break;
+      case 'semantic': optWS.checked=true; optComments.checked=true; optCase.checked=false; optIndent.checked=true; break;
+      case 'case': optWS.checked=false; optComments.checked=false; optCase.checked=true; optIndent.checked=true; break;
+    }
+  }
+  preset.addEventListener('change', ()=>{ applyPreset(preset.value); saveLS(); });
+
+  // Persistence
+  function loadLS(){
+    try{
+      left.value = localStorage.getItem(LS.left) || '';
+      right.value = localStorage.getItem(LS.right) || '';
+      const opts = JSON.parse(localStorage.getItem(LS.opts)||'{}');
+      if('ws' in opts) optWS.checked = opts.ws;
+      if('cmt' in opts) optComments.checked = opts.cmt;
+      if('ci' in opts) optCase.checked = opts.ci;
+      if('ind' in opts) optIndent.checked = opts.ind;
+      if('od' in opts) optOnlyDiff.checked = opts.od;
+      const p = localStorage.getItem(LS.preset);
+      if(p){ preset.value = p; applyPreset(p); }
+    }catch(e){}
+    updatePlaceholders(); refreshGuttersForInputs();
+  }
+  function saveLS(){
+    try{
+      localStorage.setItem(LS.left, left.value);
+      localStorage.setItem(LS.right, right.value);
+      localStorage.setItem(LS.preset, preset.value);
+      localStorage.setItem(LS.opts, JSON.stringify({
+        ws: optWS.checked, cmt: optComments.checked, ci: optCase.checked, ind: optIndent.checked, od: optOnlyDiff.checked
+      }));
+    }catch(e){}
+  }
+
+  loadLS();
+</script>
+</body>
+</html>
